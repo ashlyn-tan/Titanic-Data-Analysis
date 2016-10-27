@@ -1,0 +1,101 @@
+The dataset Titanic in Kaggle Competition is used for the analysis conducted below.
+With a given test set named as 'test.raw' and a training set named as 'train.raw', 
+both are first combined to form a full dataset 'train' for ease of computing new features and missing values.
+After the necessary steps of feature engineering and computing for the missing values,
+the first 891 rows originally from the training set is extracted out as 'traindata' with the unnecessary features dropped 
+and the remaining is named as 'test'.
+
+In this project, Logistic Regression is used in the prediction of the survival of the passengers in the dataset.
+K-fold Cross Validation is first conducted with k=10, and an accuracy rate of 0.879120879120879 is predicted.
+After predicting the surivival rate of the test dataset, an actual accuracy rate of 0.78469 is gotten instead.
+This shows that the k fold CV conducted in this project over estimated the accuracy rate.
+
+##CALLING LIBRARY
+library(ggplot2)
+
+##READING DATA
+train.raw=read.csv('train.csv',header=T,na.strings=c(''))
+test.raw=read.csv('test.csv',header=T,na.strings = c(''))
+test.raw$Survived=0
+train=rbind(train.raw,test.raw)
+
+##DATA SUMMARY FOR TRAIN.RAW
+str(train)
+#To show the structure of the data
+sapply(train,function(x) sum(is.na(x)))
+sapply(train,function(x) length(unique(x)))
+#A summary of the data to show the number of missing or unique values
+
+
+##FEATURE ENGINEERING
+##Part 1: Name of Passengers
+train$Name=as.character(train$Name)
+for (i in 1:length(train$Name)){
+  train$Salutation[i]=strsplit(train$Name, split='[,.]')[[i]][2]}
+train$Salutation=sub(' ','',train$Salutation)
+#To extract the salutation of each passenger
+table(train$Salutation)
+#To show the salutation in a table form with counts
+rare=c('Capt','Col','Don','Jonkheer','Lady','Major','Mlle','Mme','Ms','Sir','the Countess','Dona')
+train$Salutation[train$Salutation %in% rare ]='Rare'
+train$Salutation=factor(train$Salutation)
+#group the rare salutation into one category and change the salutation into factors
+
+##Part 2: Family size
+train$familysize=train$SibSp+train$Parch+1
+#form the family size using number of siblings, parents and children
+table(train$Survived,train$familysize)
+#showing the number of passengers survived or not with relation to the family size
+ggplot(train[1:891,],aes(x=familysize))+geom_bar(aes(fill=factor(Survived)),position='dodge')+scale_fill_manual(breaks=levels(train$Survived),values=c('black','red'))
+#Can be seen that the proportion of survival is higher for family size of 2,3,4, while family size of 1,5,6,7,8 and 11 has higher mortality rate
+train$famfac[train$familysize==1]=0
+train$famfac[train$familysize>1 & train$familysize<5]=1
+train$famfac[train$familysize>4]=2
+train$famfac=factor(train$famfac)
+#group the passengers with the respective family size and survival rate into famfac and change to factors
+
+##Forecast missing values
+#Part 1: Embarked
+ggplot(train,aes(x=Embarked,y=Fare,fill=factor(Pclass)))+geom_boxplot()+geom_hline(aes(yintercept=80),colour='red', linetype='dashed') 
+train$Embarked[is.na(train$Embarked)]='C'
+#from the plot, the passengers with missing values of Embarked have the same fare as the median fare of passengers with Embarked value of C
+#Part 2: Age
+ggplot(train,aes(x=Age))+geom_bar(aes(fill=factor(famfac)))+scale_fill_manual(breaks=levels(train$famfac),values=c('black','red','blue','green'))
+train$Age[is.na(train$Age)]=mean(train$Age[!is.na(train$Age)])
+
+#Part 3: Fare
+ggplot(train,aes(x=Embarked,y=Fare,fill=factor(Pclass)))+geom_boxplot()+geom_hline(aes(yintercept=80),colour='red', linetype='dashed') 
+train$Fare[is.na(train$Fare)]=mean(train$Fare[train$Embarked=='S' & train$Pclass==3 & !is.na(train$Fare)])
+
+#Dropping unneccessary variable
+drop=c('Cabin','PassengerId','Name','Ticket')
+traindata=train[1:891,!(names(train) %in% drop)]
+
+#k-fold Cross validation, k=10
+#seed is set, and random rows of 800 are used to form the training set with 91 as the testing set
+set.seed(200)
+selrow=sample(nrow(traindata),800)
+valid1=traindata[selrow,]
+test1.raw=traindata[-selrow,]
+ex='Survived'
+test1=test1.raw[,!(names(test1.raw) %in% ex)]
+
+testmodelglm=glm(Survived~.,family=binomial(link='logit'),data=valid1)
+summary(testmodelglm)
+testresultglm=predict(testmodelglm,newdata=test1,type='response')
+testresultglm=ifelse(testresultglm>0.5,1,0)
+classerror=sum(testresultglm==test1.raw$Survived)
+meanerror=80/91
+print(paste('Estimated Testing Accuracy Rate',meanerror))
+
+#Fitting Logistic Regression model
+modelglm=glm(Survived~.,family=binomial(link='logit'),data=traindata)
+summary(modelglm)
+
+#Prediction
+test=train[892:1309,!(names(train) %in% drop)]
+test=test[,!(names(test) %in% ex)]
+resultglm=predict(modelglm,newdata=test,type='response')
+resultglm=ifelse(resultglm>0.5,1,0)
+write.csv(resultglm, "resultglm.csv")
+print('Actual Testing Accuracy Rate 0.78469')
