@@ -47,6 +47,8 @@ train$familysize=train$SibSp+train$Parch+1
 table(train$Survived,train$familysize)
 #showing the number of passengers survived or not with relation to the family size
 ggplot(train[1:891,],aes(x=familysize))+geom_bar(aes(fill=factor(Survived)),position='dodge')+scale_fill_manual(breaks=levels(train$Survived),values=c('black','red'))
+![image](https://github.com/ashlyn-tan/Titanic-Data-Analysis/Family Size with Survival rate.png)
+
 #Can be seen that the proportion of survival is higher for family size of 2,3,4, while family size of 1,5,6,7,8 and 11 has higher mortality rate
 train$famfac[train$familysize==1]=0
 train$famfac[train$familysize>1 & train$familysize<5]=1
