@@ -1,0 +1,72 @@
+In this Kaggle competition, we were to predict if the survivors survived or not, which makes this a classification problem.
+For a classfication with 2 factor levels, there are a number of classification methods to be attempted below such as logistic regression,
+random forest, k nearest number or SVM.
+The below attempted logistic regression with no feature engineering to get a rough idea of the problem in hand. 
+The estimated accuracy rate is  0.7962048 with the actual kaggle accuracy rate as 0.76077.
+
+##CALLING LIBRARY
+library(ggplot2)
+library(caret)
+
+##READING DATA
+train.raw=read.csv('train.csv',header=T,na.strings=c(''))
+test.raw=read.csv('test.csv',header=T,na.strings = c(''))
+test.raw$Survived=0
+train=rbind(train.raw,test.raw)
+
+##DATA SUMMARY FOR TRAIN.RAW
+str(train)
+#To show the structure of the data
+sapply(train,function(x) sum(is.na(x)))
+sapply(train,function(x) length(unique(x)))
+#A summary of the data to show the number of missing or unique values
+
+##Forecast missing values
+#Part 1: Embarked
+ggplot(train,aes(x=Embarked,y=Fare,fill=factor(Pclass)))+geom_boxplot()+geom_hline(aes(yintercept=80),colour='red', linetype='dashed') 
+train$Embarked[is.na(train$Embarked)]='C'
+#from the plot, the passengers with missing values of Embarked have the same fare as the median fare of passengers with Embarked value of C
+#Part 2: Age
+ggplot(train,aes(x=Age))+geom_bar(aes(fill=factor(famfac)))+scale_fill_manual(breaks=levels(train$famfac),values=c('black','red','blue','green'))
+train$Age[is.na(train$Age)]=mean(train$Age[!is.na(train$Age)])
+#Part 3: Fare
+ggplot(train,aes(x=Embarked,y=Fare,fill=factor(Pclass)))+geom_boxplot()+geom_hline(aes(yintercept=80),colour='red', linetype='dashed') 
+train$Fare[is.na(train$Fare)]=mean(train$Fare[train$Embarked=='S' & train$Pclass==3 & !is.na(train$Fare)])
+
+#Dropping unneccessary variable
+drop=c('Cabin','PassengerId','Name','Ticket')
+traindata=train[1:891,!(names(train) %in% drop)]
+traindata$Survived=factor(traindata$Survived)
+
+#k-fold Cross validation, k=10 repeated 10 times
+control= trainControl(method="repeatedcv", number=10, repeats=10)
+# train the model
+set.seed(1234)
+model= train(Survived~., data=traindata, trControl=control, method="glm", family=binomial)
+print(model)
+Generalized Linear Model 
+
+891 samples
+  7 predictor
+  2 classes: '0', '1' 
+
+No pre-processing
+Resampling: Cross-Validated (10 fold, repeated 10 times) 
+Summary of sample sizes: 802, 802, 803, 802, 802, 802, ... 
+Resampling results:
+
+  Accuracy   Kappa    
+  0.7962048  0.5635706
+print(paste('Estimated Testing Accuracy Rate',model$results$Accuracy))
+
+#Fitting Logistic Regression model
+modelglm=glm(Survived~.,family=binomial(link='logit'),data=traindata)
+summary(modelglm)
+#Prediction
+test=train[892:1309,!(names(train) %in% drop)]
+test=test[,!(names(test) %in% ex)]
+resultglm=predict(modelglm,newdata=test,type='response')
+resultglm=ifelse(resultglm>0.5,1,0)
+write.csv(resultglm, "resultglm.csv")
+print('Actual Testing Accuracy Rate 0.76077')
+
